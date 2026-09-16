@@ -27,14 +27,19 @@ IMAGE_TEMP_PATH = os.path.join(tempfile.gettempdir(), "iman_post.jpg")
 
 
 def extract_title(content):
-    for line in content.split('\n'):
+    """Extract meaningful Islamic title (skip salam/greetings)"""
+    lines = content.split('\n')
+    for line in lines:
         clean = line.strip()
-        for ch in ['🌙', '✨', '🕌', '📖', '🤲', '📌', '⭐', '👉', '💚']:
+        for ch in ['🌙', '✨', '🕌', '📖', '🤲', '📌', '⭐', '👉', '💚', '*', '«', '»', '"']:
             clean = clean.replace(ch, '')
         clean = clean.strip().lstrip('#').strip()
-        if 8 < len(clean) < 100:
+        # Skip greetings and generic phrases
+        if any(skip in clean for skip in ['আসসালামু', 'আলাইকুম', 'ভাই ও বোনেরা', 'প্রিয়', 'বিসমিল্লাহ']):
+            continue
+        if 10 < len(clean) < 85:
             return clean
-    return "আল্লাহর রহমত থেকে নিরাশ হয়ো না"
+    return "আল্লাহর রহমত ও উত্তম চরিত্র"
 
 
 def run(post_slot: int = 1):
