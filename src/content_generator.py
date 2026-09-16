@@ -5,24 +5,51 @@ Generates authentic Islamic reminders, Quranic verses, Hadith, Duas, and Friday 
 
 import requests
 import random
+import re
 import os
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 GEMINI_MODELS = [
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
     "gemini-flash-latest",
-    "gemini-2.5-flash-lite",
-    "gemma-4-26b-a4b-it",
 ]
 
 SYSTEM_PROMPT = """তুমি "ঈমান" ফেসবুক পেজের ইসলামিক কনটেন্ট রাইটার।
 তোমার লক্ষ্য:
-১. সম্পূর্ণ সহিহ কুরআন ও সুন্নাহ ভিত্তিক চমৎকার ও হৃদয়ছোঁয়া ভাষায় পোস্ট লেখা।
-২. ভাষা হবে শান্ত, মার্জিত, শ্রদ্ধাশীল এবং খাঁটি বাংলা।
+১. সম্পূর্ণ সহিহ কুরআন ও সুন্নাহ ভিত্তিক চমৎকার ও হৃদয়ছোঁয়া ভাষায় খাঁটি বাংলায় ফেসবুক পোস্ট তৈরি করা।
+২. কোনো প্রকার ইংরেজি চিন্তা, ইংরেজি হেডিং, প্ল্যানিং নোট বা ড্রাফটিং লেখা যাবে না। সরাসরি চূড়ান্ত পোস্টের বাংলা টেক্সটটি আউটপুট হিসেবে দেবে।
 ৩. প্রতিটি হাদিস বা আয়াতের সাথে স্পষ্ট রেফারেন্স (যেমন: সহিহ বুখারী, সূরা আল-ইমরান) উল্লেখ করবে।
-৪. কোনো প্রকার ড্রাফট, প্ল্যানিং নোট বা ইংরেজি চিন্তাভাবনা লিখবে না। সরাসরি পোস্টের মূল বাংলা টেক্সটটি আউটপুট হিসেবে দেবে।
-৫. পোস্টের শুরুতে সুন্দর ইসলামিক অভিবাদন (আসসালামু আলাইকুম ওয়া রাহমাতুল্লাহ) দেবে।
-৬. ৫-৬টি ইসলামিক হ্যাশট্যাগ (#ঈমান #ইসলাম #হাদিস #কুরআন #দোয়া #ইসলামিকপোস্ট) দেবে।"""
+৪. পোস্টের শুরুতে 'আসসালামু আলাইকুম ওয়া রাহমাতুল্লাহ' দিয়ে শুরু করবে।
+৫. শেষে ৫-৬টি ইসলামিক হ্যাশট্যাগ (#ঈমান #ইসলাম #হাদিস #কুরআন #দোয়া #ইসলামিকপোস্ট) দেবে।"""
+
+
+def sanitize_post(text):
+    """Clean any accidental internal model thinking / reasoning notes"""
+    if not text:
+        return text
+    # Remove lines containing English planning keywords
+    cleaned_lines = []
+    skip_mode = False
+    for line in text.split('\n'):
+        l_strip = line.strip()
+        # If line contains English planning phrases, skip it
+        if any(marker in l_strip for marker in [
+            'Idea 1:', 'Idea 2:', 'Idea 3:', 'Decision:', 'Hadith Selection:',
+            'Refined selection', 'Greeting:', 'Hook (Intro):', 'Drafting (Mental):',
+            'Drafting:', 'Call to Action (Amal):', 'Reflection/Expansion', 'The Hadith (Arabic'
+        ]):
+            continue
+        if re.match(r'^\s*\*\s*\*(Idea|Decision|Refined|Greeting|Hook|Drafting|Call to Action)', l_strip):
+            continue
+        # Also skip English system-like descriptions at the top
+        if 'Islamic Content Writer' in l_strip or 'Facebook page "ঈমান"' in l_strip or 'Authentic (Sahih)' in l_strip:
+            continue
+        cleaned_lines.append(line)
+
+    result = '\n'.join(cleaned_lines).strip()
+    return result
 
 
 def call_ai(prompt):
@@ -32,16 +59,18 @@ def call_ai(prompt):
     full_prompt = SYSTEM_PROMPT + "\n\n" + prompt
     payload = {
         "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 800}
+        "generationConfig": {"temperature": 0.6, "maxOutputTokens": 2500}
     }
     headers = {"Content-Type": "application/json"}
 
     for model in GEMINI_MODELS:
         try:
             url = GEMINI_BASE + model + ":generateContent?key=" + GEMINI_API_KEY
-            r = requests.post(url, json=payload, headers=headers, timeout=45)
+            r = requests.post(url, json=payload, headers=headers, timeout=25)
             if r.status_code == 200:
-                return r.json()['candidates'][0]['content']['parts'][0]['text']
+                raw_text = r.json()['candidates'][0]['content']['parts'][0]['text']
+                return sanitize_post(raw_text)
+            print(f"⚠️ {model} returned status: {r.status_code}")
         except Exception as e:
             print(f"⚠️ Error {model}: {e}")
 
@@ -59,7 +88,8 @@ def generate_hadith_post():
     ]
     topic = random.choice(topics)
     prompt = f"""'{topic}' বিষয়ে একটি মন ছুঁয়ে যাওয়া সহিহ হাদিসের ফেসবুক পোস্ট লেখো।
-হাদিসের আরবি ও বাংলা অর্থ এবং সঠিক কিতাবের রেফারেন্স উল্লেখ করো। শেষে আমল করার আহ্বান জানাও।"""
+হাদিসের আরবি ও বাংলা অর্থ এবং সঠিক কিতাবের রেফারেন্স উল্লেখ করো।
+শুধুমাত্র পোস্টের খাঁটি বাংলা টেক্সট দেবে। কোনো প্ল্যানিং বা ড্রাফট নোট লিখবে না।"""
     return call_ai(prompt)
 
 
@@ -73,7 +103,8 @@ def generate_quran_verse_post():
     ]
     topic = random.choice(topics)
     prompt = f"""'{topic}' বিষয়ে পবিত্র কুরআনের আয়াত দিয়ে একটি সুন্দর শিক্ষণীয় ফেসবুক পোস্ট লেখো।
-আয়াতের সহজ সরল বাংলা অনুবাদ ও বাস্তব জীবনে এর শিক্ষা তুলে ধরো।"""
+আয়াতের সহজ সরল বাংলা অনুবাদ ও বাস্তব জীবনে এর শিক্ষা তুলে ধরো।
+শুধুমাত্র পোস্টের খাঁটি বাংলা টেক্সট দেবে। কোনো প্ল্যানিং বা ড্রাফট নোট লিখবে না।"""
     return call_ai(prompt)
 
 
@@ -87,13 +118,15 @@ def generate_dua_and_dhikr_post():
     ]
     topic = random.choice(topics)
     prompt = f"""'{topic}' বিষয়ে একটি অতি প্রয়োজনীয় দোয়ার পোস্ট লেখো।
-আরবি টেক্সট, বাংলা উচ্চারণ ও বাংলা অর্থসহ স্পষ্ট করে সাজিয়ে দাও।"""
+আরবি টেক্সট, বাংলা উচ্চারণ ও বাংলা অর্থসহ স্পষ্ট করে সাজিয়ে দাও।
+শুধুমাত্র পোস্টের খাঁটি বাংলা টেক্সট দেবে। কোনো প্ল্যানিং বা ড্রাফট নোট লিখবে না।"""
     return call_ai(prompt)
 
 
 def generate_juma_post():
     """Friday Special Post"""
-    prompt = """পবিত্র জুমার দিনের ফজিলত, সূরা কাহাফ তিলাওয়াত এবং দরূদ শরীফ পাঠের গুরুত্ব নিয়ে একটি বরকতময় জুমার শুভেচ্ছা পোস্ট লেখো।"""
+    prompt = """পবিত্র জুমার দিনের ফজিলত, সূরা কাহাফ তিলাওয়াত এবং দরূদ শরীফ পাঠের গুরুত্ব নিয়ে একটি বরকতময় জুমার শুভেচ্ছা পোস্ট লেখো।
+শুধুমাত্র পোস্টের খাঁটি বাংলা টেক্সট দেবে। কোনো প্ল্যানিং বা ড্রাফট নোট লিখবে না।"""
     return call_ai(prompt)
 
 
