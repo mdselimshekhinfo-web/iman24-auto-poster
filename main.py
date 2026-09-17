@@ -33,49 +33,71 @@ def extract_islamic_quote_and_ref(content: str):
     - quote: মূল হাদিসের বাংলা বাণী বা অর্থ
     - reference: সূত্র বা কিতাবের নাম
     """
-    subheader = "রাসূলুল্লাহ (ﷺ) বলেছেন:"
+    subheader = "রাসূলুল্লাহ (সা.) বলেছেন:"
     quote = ""
     reference = ""
 
     lines = [l.strip() for l in content.split('\n') if l.strip()]
 
+    # 1. Subheader
     for line in lines:
-        # Check subheader
-        if any(w in line for w in ['বলেছেন:', 'ইরশাদ হয়েছে:', 'ফরমান:', 'ইরশাদ করেন:']):
+        if any(w in line for w in ['বলেছেন:', 'ইরশাদ করেছেন:', 'ইরশাদ করেন:', 'ফরমান:']):
             clean_sub = line.replace('«', '').replace('»', '').replace('*', '').strip()
-            # remove salam if attached
-            if not any(s in clean_sub for s in ['আসসালামু', 'আলাইকুম']):
+            if not any(s in clean_sub for s in ['আসসালামু', 'আলাইকুম', 'বর্ণিত']):
                 subheader = clean_sub[:45]
                 break
 
-    # Look for the core quote (after অর্থ: or in quotation marks)
-    for line in lines:
-        if 'অর্থ:' in line or 'অর্থ :' in line:
-            quote = line.split(':', 1)[1].replace('"', '').replace('«', '').replace('»', '').strip()
-            break
-        elif line.startswith('"') and line.endswith('"') and len(line) > 15:
-            quote = line.replace('"', '').strip()
+    # 2. Quote Extraction
+    # Priority A: Bengali quotation marks ‘ ’ or “ ” or " " or « »
+    import re
+    for q_match in re.findall(r'[‘“"«]([^’”"»]{15,130})[’”"»]', content):
+        if not any('\u0600' <= c <= '\u06FF' for c in q_match): # skip pure Arabic
+            quote = q_match.strip()
             break
 
-    # If quote not found by prefix, find the primary message line
+    # Priority B: Look for অর্থ:
     if not quote:
         for line in lines:
-            if any(s in line for s in ['আসসালামু', 'আলাইকুম', 'প্রিয়', 'ভাই ও বোনেরা', 'বিসমিল্লাহ', '#', 'শেয়ার']):
+            if 'অর্থ:' in line or 'অর্থ :' in line:
+                quote = line.split(':', 1)[1].replace('"', '').replace('«', '').replace('»', '').replace('‘', '').replace('’', '').strip()
+                break
+
+    # Priority C: Look for narration after Arabic text
+    if not quote:
+        found_arabic = False
+        for line in lines:
+            if any('\u0600' <= c <= '\u06FF' for c in line):
+                found_arabic = True
                 continue
-            if any('\u0600' <= c <= '\u06FF' for c in line): # skip raw Arabic
+            if found_arabic and not any(skip in line for skip in ['সূত্র', 'সহিহ', 'তিরমিযী', 'বুখারী', 'মুসলিম']):
+                if 'বলতেন,' in line:
+                    quote = line.split('বলতেন,')[1].strip()
+                elif 'বলেন,' in line:
+                    quote = line.split('বলেন,')[1].strip()
+                else:
+                    quote = line
+                quote = quote.replace('‘', '').replace('’', '').replace('"', '').strip()
+                if len(quote) > 15:
+                    break
+
+    # Priority D: Fallback meaningful line
+    if not quote or len(quote) < 10:
+        for line in lines:
+            if any(s in line for s in ['আসসালামু', 'আলাইকুম', 'প্রিয়', 'ভাই ও বোনেরা', 'বিসমিল্লাহ', '#', 'শেয়ার', 'বলেছেন:', 'ইরশাদ']):
+                continue
+            if any('\u0600' <= c <= '\u06FF' for c in line):
                 continue
             if 15 < len(line) < 120:
-                quote = line.replace('*', '').replace('"', '').strip()
+                quote = line.replace('*', '').replace('"', '').replace('‘', '').replace('’', '').strip()
                 break
 
     if not quote:
         quote = "উত্তম চরিত্র ও সুন্দর ব্যবহারের চেয়ে ভারী আমল আর কিছু নেই।"
 
-    # Look for reference
+    # 3. Look for reference
     for line in lines:
-        if any(w in line for w in ['সূত্র:', 'সূত্র :', 'সহিহ বুখারী', 'সহিহ মুসলিম', 'সুনানে', 'তিরমিযী', 'সূরা ']):
+        if any(w in line for w in ['সহিহ বুখারী', 'সহিহ মুসলিম', 'সুনানে', 'তিরমিযী', 'সূরা ']):
             clean_ref = line.replace('(', '').replace(')', '').replace('সূত্র:', '').strip()
-            # take first 40 chars
             reference = clean_ref[:45]
             break
 

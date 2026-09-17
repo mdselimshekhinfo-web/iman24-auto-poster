@@ -150,7 +150,8 @@ def create_islamic_image(quote_title, output_path="/tmp/islamic_post.jpg", refer
     render_shaped_text(img, f"ঈমান  |  iman24.bd", w // 2, 110, 32, gold)
 
     # 2. Subheader (e.g. রাসূলুল্লাহ (সা.) বলেছেন: বা পবিত্র কুরআনে ইরশাদ হয়েছে:)
-    clean_sub = subheader.replace('🌙', '').replace('✨', '').replace('ﷺ', '(সা.)').replace('ﷺ', '(সা.)').strip()
+    clean_sub = subheader.replace('🌙', '').replace('✨', '').replace('ﷺ', '(সা.)')
+    clean_sub = clean_sub.replace('((সা.))', '(সা.)').replace('((সা.))', '(সা.)').strip()
     render_shaped_text(img, clean_sub, w // 2, 220, 44, (245, 215, 120))
 
     # 3. Core Hadith / Ayat Quote Box
