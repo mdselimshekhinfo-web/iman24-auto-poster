@@ -51,7 +51,17 @@ def extract_islamic_quote_and_ref(content: str):
     # Priority A: Look for অনুবাদ: or অর্থ:
     for line in lines:
         if any(k in line for k in ['অনুবাদ:', 'অনুবাদ :', 'অর্থ:', 'অর্থ :']):
-            clean_q = line.split(':', 1)[1].replace('"', '').replace('«', '').replace('»', '').replace('‘', '').replace('’', '').strip()
+            clean_q = line.split(':', 1)[1].strip()
+            # If line contains quotation inside like: সুহাইব (রা.) থেকে বর্ণিত... "মুমিনের বিষয়টি..."
+            import re
+            inner_q = re.search(r'[‘“"«]([^’”"»]{15,160})[’”"»]', clean_q)
+            if inner_q:
+                clean_q = inner_q.group(1).strip()
+            else:
+                for intro in ['থেকে বর্ণিত,', 'থেকে বর্ণিত', 'তিনি বলেন,', 'বলেছেন,', 'বলতেন,']:
+                    if intro in clean_q:
+                        clean_q = clean_q.split(intro)[-1].strip()
+            clean_q = clean_q.replace('"', '').replace('«', '').replace('»', '').replace('‘', '').replace('’', '').strip()
             if len(clean_q) > 15:
                 quote = clean_q
                 break
