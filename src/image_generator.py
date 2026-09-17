@@ -163,12 +163,25 @@ def create_islamic_image(quote_title, output_path="/tmp/islamic_post.jpg", refer
 
     # Wrap the core quote
     clean_quote = quote_title.replace('«', '').replace('»', '').replace('"', '').strip()
-    wrapped = textwrap.fill(clean_quote, width=17)
-    lines = wrapped.split('\n')[:5]
+    wrapped = textwrap.fill(clean_quote, width=18)
+    lines = [l.strip() for l in wrapped.split('\n') if l.strip()]
 
-    y_quote_start = box_top + 100
-    for i, line in enumerate(lines):
-        render_shaped_text(img, line.strip(), w // 2, y_quote_start + i * 85, 48, (255, 255, 255))
+    # Dynamic font sizing based on lines
+    if len(lines) <= 3:
+        font_size_quote = 48
+        line_spacing = 85
+        y_quote_start = box_top + 110
+    elif len(lines) == 4:
+        font_size_quote = 44
+        line_spacing = 75
+        y_quote_start = box_top + 90
+    else:
+        font_size_quote = 38
+        line_spacing = 65
+        y_quote_start = box_top + 70
+
+    for i, line in enumerate(lines[:6]):
+        render_shaped_text(img, line, w // 2, y_quote_start + i * line_spacing, font_size_quote, (255, 255, 255))
 
     # 4. Clear Reference inside the box
     if reference:

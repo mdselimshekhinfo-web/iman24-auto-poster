@@ -114,7 +114,7 @@ def extract_islamic_quote_and_ref(content: str):
             reference = clean_ref[:45]
             break
 
-    return subheader, quote[:110], reference
+    return subheader, quote[:150], reference
 
 
 def run(post_slot: int = 1):
