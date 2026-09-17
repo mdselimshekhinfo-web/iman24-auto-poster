@@ -26,20 +26,60 @@ FB_PAGE_ACCESS_TOKEN = os.environ.get('FB_PAGE_ACCESS_TOKEN', '')
 IMAGE_TEMP_PATH = os.path.join(tempfile.gettempdir(), "iman_post.jpg")
 
 
-def extract_title(content):
-    """Extract meaningful Islamic title (skip salam/greetings)"""
-    lines = content.split('\n')
+def extract_islamic_quote_and_ref(content: str):
+    """
+    Extract core Hadith / Quran quote, reference, and subheader from post:
+    - subheader: রাসূলুল্লাহ (ﷺ) বলেছেন: / পবিত্র কুরআনে ইরশাদ হয়েছে: / আল্লাহর রাসূল বলেছেন:
+    - quote: মূল হাদিসের বাংলা বাণী বা অর্থ
+    - reference: সূত্র বা কিতাবের নাম
+    """
+    subheader = "রাসূলুল্লাহ (ﷺ) বলেছেন:"
+    quote = ""
+    reference = ""
+
+    lines = [l.strip() for l in content.split('\n') if l.strip()]
+
     for line in lines:
-        clean = line.strip()
-        for ch in ['🌙', '✨', '🕌', '📖', '🤲', '📌', '⭐', '👉', '💚', '*', '«', '»', '"']:
-            clean = clean.replace(ch, '')
-        clean = clean.strip().lstrip('#').strip()
-        # Skip greetings and generic phrases
-        if any(skip in clean for skip in ['আসসালামু', 'আলাইকুম', 'ভাই ও বোনেরা', 'প্রিয়', 'বিসমিল্লাহ']):
-            continue
-        if 10 < len(clean) < 85:
-            return clean
-    return "আল্লাহর রহমত ও উত্তম চরিত্র"
+        # Check subheader
+        if any(w in line for w in ['বলেছেন:', 'ইরশাদ হয়েছে:', 'ফরমান:', 'ইরশাদ করেন:']):
+            clean_sub = line.replace('«', '').replace('»', '').replace('*', '').strip()
+            # remove salam if attached
+            if not any(s in clean_sub for s in ['আসসালামু', 'আলাইকুম']):
+                subheader = clean_sub[:45]
+                break
+
+    # Look for the core quote (after অর্থ: or in quotation marks)
+    for line in lines:
+        if 'অর্থ:' in line or 'অর্থ :' in line:
+            quote = line.split(':', 1)[1].replace('"', '').replace('«', '').replace('»', '').strip()
+            break
+        elif line.startswith('"') and line.endswith('"') and len(line) > 15:
+            quote = line.replace('"', '').strip()
+            break
+
+    # If quote not found by prefix, find the primary message line
+    if not quote:
+        for line in lines:
+            if any(s in line for s in ['আসসালামু', 'আলাইকুম', 'প্রিয়', 'ভাই ও বোনেরা', 'বিসমিল্লাহ', '#', 'শেয়ার']):
+                continue
+            if any('\u0600' <= c <= '\u06FF' for c in line): # skip raw Arabic
+                continue
+            if 15 < len(line) < 120:
+                quote = line.replace('*', '').replace('"', '').strip()
+                break
+
+    if not quote:
+        quote = "উত্তম চরিত্র ও সুন্দর ব্যবহারের চেয়ে ভারী আমল আর কিছু নেই।"
+
+    # Look for reference
+    for line in lines:
+        if any(w in line for w in ['সূত্র:', 'সূত্র :', 'সহিহ বুখারী', 'সহিহ মুসলিম', 'সুনানে', 'তিরমিযী', 'সূরা ']):
+            clean_ref = line.replace('(', '').replace(')', '').replace('সূত্র:', '').strip()
+            # take first 40 chars
+            reference = clean_ref[:45]
+            break
+
+    return subheader, quote[:110], reference
 
 
 def run(post_slot: int = 1):
@@ -66,8 +106,12 @@ def run(post_slot: int = 1):
 
     print(f"\n📄 Preview:\n{content[:200]}...\n")
 
-    title = extract_title(content)
-    create_islamic_image(title, output_path=IMAGE_TEMP_PATH)
+    subheader, core_quote, reference = extract_islamic_quote_and_ref(content)
+    print(f"🎯 Subheader: {subheader}")
+    print(f"📜 Core Quote: {core_quote}")
+    print(f"📚 Reference: {reference}")
+
+    create_islamic_image(core_quote, output_path=IMAGE_TEMP_PATH, reference=reference, subheader=subheader)
 
     print("📤 Posting with Islamic Green Image...")
     post_id = fb.post_with_image(content, IMAGE_TEMP_PATH)
