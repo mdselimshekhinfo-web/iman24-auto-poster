@@ -48,19 +48,22 @@ def extract_islamic_quote_and_ref(content: str):
                 break
 
     # 2. Quote Extraction
-    # Priority A: Bengali quotation marks ‘ ’ or “ ” or " " or « »
-    import re
-    for q_match in re.findall(r'[‘“"«]([^’”"»]{15,130})[’”"»]', content):
-        if not any('\u0600' <= c <= '\u06FF' for c in q_match): # skip pure Arabic
-            quote = q_match.strip()
-            break
-
-    # Priority B: Look for অর্থ:
-    if not quote:
-        for line in lines:
-            if 'অর্থ:' in line or 'অর্থ :' in line:
-                quote = line.split(':', 1)[1].replace('"', '').replace('«', '').replace('»', '').replace('‘', '').replace('’', '').strip()
+    # Priority A: Look for অনুবাদ: or অর্থ:
+    for line in lines:
+        if any(k in line for k in ['অনুবাদ:', 'অনুবাদ :', 'অর্থ:', 'অর্থ :']):
+            clean_q = line.split(':', 1)[1].replace('"', '').replace('«', '').replace('»', '').replace('‘', '').replace('’', '').strip()
+            if len(clean_q) > 15:
+                quote = clean_q
                 break
+
+    # Priority B: Bengali quotation marks ‘ ’ or “ ” or " " or « »
+    if not quote:
+        import re
+        for q_match in re.findall(r'[‘“"«]([^’”"»]{15,160})[’”"»]', content):
+            if not any('\u0600' <= c <= '\u06FF' for c in q_match): # skip pure Arabic
+                if not any(skip in q_match for skip in ['ভাই ও বোনেরা', 'আসসালামু', 'আলাইকুম']):
+                    quote = q_match.strip()
+                    break
 
     # Priority C: Look for narration after Arabic text
     if not quote:
