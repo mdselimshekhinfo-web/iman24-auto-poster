@@ -17,13 +17,14 @@ if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
 from src.content_generator import generate_islamic_post
-from src.image_generator import create_islamic_image
+from src.image_generator import create_islamic_image, create_islamic_reels_video
 from src.fb_poster import FacebookPoster
 
 FB_PAGE_ID = os.environ.get('FB_PAGE_ID', '104957755550666')
 FB_PAGE_ACCESS_TOKEN = os.environ.get('FB_PAGE_ACCESS_TOKEN', '')
 
 IMAGE_TEMP_PATH = os.path.join(tempfile.gettempdir(), "iman_post.jpg")
+REEL_TEMP_PATH = os.path.join(tempfile.gettempdir(), "iman_reel.mp4")
 
 
 def extract_islamic_quote_and_ref(content: str):
@@ -148,6 +149,7 @@ def run(post_slot: int = 1):
     print(f"📜 Core Quote: {core_quote}")
     print(f"📚 Reference: {reference}")
 
+    # ── 1. Create and Post Photo Post ─────────────────────────────
     create_islamic_image(core_quote, output_path=IMAGE_TEMP_PATH, reference=reference, subheader=subheader)
 
     print("📤 Posting with Islamic Green Image...")
@@ -166,8 +168,36 @@ def run(post_slot: int = 1):
             "📌 পোস্টটি ভালো লাগলে সদকায়ে জারিয়ার নিয়তে শেয়ার করে দ্বীনের দাওয়াত ছড়িয়ে দিন। পেজটি ফলো দিয়ে সাথে থাকুন। জাযাকাল্লাহু খাইরান! 💚"
         )
     else:
-        print("❌ Post failed!")
-        sys.exit(1)
+        print("❌ Photo post failed!")
+
+    # ── 2. Automatic Daily Reel Post (Peak Slot or Daily) ─────────
+    # Post reels once daily during slot 1 or 2 to maximize reach
+    should_post_reel = os.environ.get('POST_REEL', 'true').lower() in ['true', '1']
+    if should_post_reel:
+        print("\n🎬 Generating Daily Islamic Video Reel with Voiceover...")
+        try:
+            reel_video = create_islamic_reels_video(core_quote, output_video_path=REEL_TEMP_PATH, reference=reference, subheader=subheader)
+            if reel_video and os.path.exists(reel_video):
+                reel_caption = f"""{subheader}
+«{core_quote}»
+{f'— {reference}' if reference else ''}
+
+প্রতিদিনের সহিহ হাদিস ও ইসলামিক রিমাইন্ডার পেতে পেজটি ফলো দিয়ে সাথে থাকুন।
+#হাদিস #ইসলামিক_রিমাইন্ডার #islamicreels #reels #viralreels #iman24"""
+                print("📤 Uploading Reel to Facebook...")
+                reel_id = fb.post_reel(reel_video, reel_caption)
+                if reel_id:
+                    print(f"🌟 Daily Reel Successfully Published! ID: {reel_id}")
+            else:
+                print("⚠️ Reel video generation skipped or failed.")
+        except Exception as re:
+            print(f"⚠️ Reel pipeline exception: {re}")
+        finally:
+            if os.path.exists(REEL_TEMP_PATH):
+                try:
+                    os.remove(REEL_TEMP_PATH)
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

@@ -3,4 +3,4 @@ Pillow>=10.0.0
 uharfbuzz==0.56.1
 freetype-py==2.5.1
 numpy
-
+edge-tts>=6.1.10
