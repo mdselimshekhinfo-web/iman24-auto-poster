@@ -116,89 +116,136 @@ def draw_gradient(img, c1, c2):
 
 def create_islamic_image(quote_title, output_path="/tmp/islamic_post.jpg", reference="", subheader="রাসূলুল্লাহ (ﷺ) বলেছেন:"):
     """
-    Generate High-Impact 4:5 Mobile Portrait Islamic Poster (1080x1350)
-    Places the MAIN Hadith / Quranic teaching right in the center of the poster!
+    Generate Soul-Soothing, Mood-Refreshing 4:5 Mobile Islamic Reminder Poster (1080x1350).
+    Features high-res peaceful visuals (Madinah, Makkah, calm mosque, morning Quran, tranquil nature)
+    with an elegant dark glassmorphism card highlighting the core Hadith/Ayat.
     """
     w, h = 1080, 1350
-    bg = random.choice(BG_GRADIENTS)
     gold = random.choice(GOLD_ACCENTS)
 
-    img = Image.new('RGB', (w, h), (5, 25, 15))
-    draw_gradient(img, bg[0], bg[1])
+    # 1. Select a peaceful aesthetic background
+    bg_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'backgrounds')
+    selected_bg = None
+    if os.path.exists(bg_dir):
+        bg_files = [f for f in os.listdir(bg_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+        if bg_files:
+            selected_bg = os.path.join(bg_dir, random.choice(bg_files))
 
-    # Overlay aesthetic mosque visual if available
-    bg_asset = os.path.join(os.path.dirname(__file__), '..', 'assets', 'islamic_bg.jpg')
-    if os.path.exists(bg_asset):
+    # Fallback to single bg if directory missing
+    if not selected_bg:
+        single_bg = os.path.join(os.path.dirname(__file__), '..', 'assets', 'islamic_bg.jpg')
+        if os.path.exists(single_bg):
+            selected_bg = single_bg
+
+    if selected_bg and os.path.exists(selected_bg):
         try:
-            mosque_img = Image.open(bg_asset)
-            mosque_resized = mosque_img.resize((w, h), Image.Resampling.LANCZOS)
-            img = Image.blend(img, mosque_resized, alpha=0.35)
+            base = Image.open(selected_bg).convert('RGB')
+            base = base.resize((w, h), Image.Resampling.LANCZOS)
         except Exception:
-            pass
+            base = Image.new('RGB', (w, h), (5, 25, 15))
+            draw_gradient(base, random.choice(BG_GRADIENTS)[0], random.choice(BG_GRADIENTS)[1])
+    else:
+        base = Image.new('RGB', (w, h), (5, 25, 15))
+        draw_gradient(base, random.choice(BG_GRADIENTS)[0], random.choice(BG_GRADIENTS)[1])
 
+    # 2. Add Mood-Refreshing Vignette & Glassmorphism Overlay
+    overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    ov_draw = ImageDraw.Draw(overlay)
+
+    # Top atmospheric gradient
+    for y in range(260):
+        alpha = int(150 * (1 - y / 260))
+        ov_draw.line([(0, y), (w, y)], fill=(8, 18, 12, alpha))
+
+    # Card dimensions (Centered, golden framed, frosted glass)
+    box_w = 940
+    box_top = 340
+    box_bottom = 980
+    box_left = (w - box_w) // 2
+    box_right = (w + box_w) // 2
+
+    # Frosted dark emerald/charcoal container with rich opacity for crystal clear text
+    ov_draw.rounded_rectangle(
+        [box_left, box_top, box_right, box_bottom],
+        radius=24,
+        fill=(6, 20, 15, 218),
+        outline=(*gold[:3], 225),
+        width=3
+    )
+
+    # Bottom atmospheric gradient
+    for y in range(1140, h):
+        alpha = int(185 * ((y - 1140) / 210))
+        ov_draw.line([(0, y), (w, y)], fill=(5, 15, 10, alpha))
+
+    img = Image.alpha_composite(base.convert('RGBA'), overlay).convert('RGB')
     draw = ImageDraw.Draw(img)
 
     # Islamic Double Border
-    draw.rectangle([35, 35, w - 35, h - 35], outline=gold, width=3)
-    draw.rectangle([45, 45, w - 45, h - 45], outline=(*gold[:3],), width=1)
+    draw.rectangle([30, 30, w - 30, h - 30], outline=gold, width=2)
+    draw.rectangle([38, 38, w - 38, h - 38], outline=(*gold[:3],), width=1)
 
     # Corner Islamic Diamonds
-    for (cx, cy) in [(45, 45), (w - 45, 45), (45, h - 45), (w - 45, h - 45)]:
-        draw.polygon([(cx, cy - 10), (cx + 10, cy), (cx, cy + 10), (cx - 10, cy)], fill=gold)
+    for (cx, cy) in [(38, 38), (w - 38, 38), (38, h - 38), (w - 38, h - 38)]:
+        draw.polygon([(cx, cy - 8), (cx + 8, cy), (cx, cy + 8), (cx - 8, cy)], fill=gold)
 
     # 1. Page Header Badge
-    render_shaped_text(img, f"ঈমান  |  iman24.bd", w // 2, 110, 32, gold)
+    render_shaped_text(img, "ঈমান  |  iman24.bd", w // 2, 90, 30, gold)
 
-    # 2. Subheader (e.g. রাসূলুল্লাহ (সা.) বলেছেন: বা পবিত্র কুরআনে ইরশাদ হয়েছে:)
+    # 2. Subheader (e.g. রাসূলুল্লাহ (সা.) ইরশাদ করেছেন:)
     clean_sub = subheader.replace('🌙', '').replace('✨', '').replace('ﷺ', '(সা.)')
     clean_sub = clean_sub.replace('((সা.))', '(সা.)').replace('((সা.))', '(সা.)').strip()
-    render_shaped_text(img, clean_sub, w // 2, 220, 44, (245, 215, 120))
+    render_shaped_text(img, clean_sub, w // 2, 185, 42, (255, 255, 255))
 
-    # 3. Core Hadith / Ayat Quote Box
-    box_top = 300
-    box_bottom = 850
-    box_w = 920
-    draw.rectangle([(w - box_w) // 2, box_top, (w + box_w) // 2, box_bottom],
-                   outline=gold, fill=(8, 30, 20), width=2)
-
-    # Wrap the core quote
+    # 3. Core Hadith / Ayat Quote
     clean_quote = quote_title.replace('«', '').replace('»', '').replace('"', '').strip()
-    wrapped = textwrap.fill(clean_quote, width=18)
+    
+    # Adaptive wrap width & sizing based on quote length
+    quote_len = len(clean_quote)
+    if quote_len <= 50:
+        wrap_w = 18
+        font_size_quote = 48
+        line_spacing = 88
+        y_quote_start = box_top + 130
+    elif quote_len <= 90:
+        wrap_w = 22
+        font_size_quote = 42
+        line_spacing = 76
+        y_quote_start = box_top + 100
+    elif quote_len <= 130:
+        wrap_w = 25
+        font_size_quote = 36
+        line_spacing = 66
+        y_quote_start = box_top + 80
+    else:
+        wrap_w = 27
+        font_size_quote = 33
+        line_spacing = 58
+        y_quote_start = box_top + 65
+
+    wrapped = textwrap.fill(clean_quote, width=wrap_w)
     lines = [l.strip() for l in wrapped.split('\n') if l.strip()]
 
-    # Dynamic font sizing based on lines
-    if len(lines) <= 3:
-        font_size_quote = 48
-        line_spacing = 85
-        y_quote_start = box_top + 110
-    elif len(lines) == 4:
-        font_size_quote = 44
-        line_spacing = 75
-        y_quote_start = box_top + 90
-    else:
-        font_size_quote = 38
-        line_spacing = 65
-        y_quote_start = box_top + 70
-
-    for i, line in enumerate(lines[:6]):
+    for i, line in enumerate(lines[:8]):
         render_shaped_text(img, line, w // 2, y_quote_start + i * line_spacing, font_size_quote, (255, 255, 255))
+
 
     # 4. Clear Reference inside the box
     if reference:
         clean_ref = f"— {reference.strip()}"
-        render_shaped_text(img, clean_ref, w // 2, box_bottom - 50, 30, gold)
+        render_shaped_text(img, clean_ref, w // 2, box_bottom - 60, 32, gold)
 
-    # 5. Curiosity Hook & CTA Button
-    btn_w = 520
-    btn_h = 65
-    btn_y = 930
-    draw.rectangle([(w - btn_w) // 2, btn_y, (w + btn_w) // 2, btn_y + btn_h],
-                   fill=gold, outline=(255, 255, 255), width=1)
-    render_shaped_text(img, "বিস্তারিত ক্যাপশনে পড়ুন", w // 2, btn_y + 48, 32, (10, 40, 20))
+    # 5. Curiosity Hook & CTA Pill Button
+    btn_w = 480
+    btn_h = 60
+    btn_y = 1040
+    draw.rounded_rectangle([(w - btn_w) // 2, btn_y, (w + btn_w) // 2, btn_y + btn_h], radius=16, fill=gold)
+    render_shaped_text(img, "বিস্তারিত ক্যাপশনে পড়ুন", w // 2, btn_y + 44, 30, (15, 30, 20))
 
     # 6. Bottom Footer Tagline
-    render_shaped_text(img, "শান্তি ও হেদায়েতের পথে প্রতিদিনের পাথেয়", w // 2, h - 70, 24, (180, 220, 180))
+    render_shaped_text(img, "শান্তি ও হেদায়েতের পথে প্রতিদিনের পাথেয়", w // 2, h - 70, 26, (225, 240, 225))
 
     img.save(output_path, 'JPEG', quality=95)
-    print(f"🖼️ Islamic Quote Poster Created: {output_path}")
+    print(f"[OK] Soul-Refreshing Islamic Poster Created: {output_path}")
     return output_path
+
