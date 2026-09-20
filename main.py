@@ -48,13 +48,15 @@ def extract_islamic_quote_and_ref(content: str):
                 break
 
     # 2. Quote Extraction
-    # Priority A: Look for অনুবাদ: or অর্থ:
-    for line in lines:
-        if any(k in line for k in ['অনুবাদ:', 'অনুবাদ :', 'অর্থ:', 'অর্থ :']):
-            clean_q = line.split(':', 1)[1].strip()
-            # If line contains quotation inside like: সুহাইব (রা.) থেকে বর্ণিত... "মুমিনের বিষয়টি..."
+    # Priority A: Look for অনুবাদ: or অর্থ: (including on the next line)
+    for idx, line in enumerate(lines):
+        if any(line.startswith(k) or line == k for k in ['অনুবাদ:', 'অনুবাদ :', 'অর্থ:', 'অর্থ :']):
+            clean_q = line.split(':', 1)[1].strip() if ':' in line else ""
+            if not clean_q and idx + 1 < len(lines):
+                clean_q = lines[idx + 1].strip()
+
             import re
-            inner_q = re.search(r'[‘“"«]([^’”"»]{15,160})[’”"»]', clean_q)
+            inner_q = re.search(r'[‘“"«]([^’”"»]{15,280})[’”"»]', clean_q)
             if inner_q:
                 clean_q = inner_q.group(1).strip()
             else:
@@ -69,7 +71,7 @@ def extract_islamic_quote_and_ref(content: str):
     # Priority B: Bengali quotation marks ‘ ’ or “ ” or " " or « »
     if not quote:
         import re
-        for q_match in re.findall(r'[‘“"«]([^’”"»]{15,160})[’”"»]', content):
+        for q_match in re.findall(r'[‘“"«]([^’”"»]{15,280})[’”"»]', content):
             if not any('\u0600' <= c <= '\u06FF' for c in q_match): # skip pure Arabic
                 if not any(skip in q_match for skip in ['ভাই ও বোনেরা', 'আসসালামু', 'আলাইকুম']):
                     quote = q_match.strip()
@@ -82,7 +84,7 @@ def extract_islamic_quote_and_ref(content: str):
             if any('\u0600' <= c <= '\u06FF' for c in line):
                 found_arabic = True
                 continue
-            if found_arabic and not any(skip in line for skip in ['সূত্র', 'সহিহ', 'তিরমিযী', 'বুখারী', 'মুসলিম']):
+            if found_arabic and not any(skip in line for skip in ['সূত্র', 'সহিহ', 'তিরমিযী', 'তিরমিজি', 'বুখারী', 'মুসলিম']):
                 if 'বলতেন,' in line:
                     quote = line.split('বলতেন,')[1].strip()
                 elif 'বলেন,' in line:
@@ -100,7 +102,7 @@ def extract_islamic_quote_and_ref(content: str):
                 continue
             if any('\u0600' <= c <= '\u06FF' for c in line):
                 continue
-            if 15 < len(line) < 120:
+            if 15 < len(line) < 160:
                 quote = line.replace('*', '').replace('"', '').replace('‘', '').replace('’', '').strip()
                 break
 
@@ -109,12 +111,12 @@ def extract_islamic_quote_and_ref(content: str):
 
     # 3. Look for reference
     for line in lines:
-        if any(w in line for w in ['সহিহ বুখারী', 'সহিহ মুসলিম', 'সুনানে', 'তিরমিযী', 'সূরা ']):
+        if any(w in line for w in ['সহিহ বুখারী', 'সহিহ মুসলিম', 'সুনানে', 'তিরমিযী', 'তিরমিজি', 'তিরমিযি', 'আবু দাউদ', 'ইবনে মাজাহ', 'নাসাঈ', 'সূরা ']):
             clean_ref = line.replace('(', '').replace(')', '').replace('সূত্র:', '').strip()
-            reference = clean_ref[:45]
+            reference = clean_ref[:50]
             break
 
-    return subheader, quote[:150], reference
+    return subheader, quote[:250], reference
 
 
 def run(post_slot: int = 1):
