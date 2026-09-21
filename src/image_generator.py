@@ -410,10 +410,10 @@ def create_islamic_reels_video(quote_title, output_video_path="/tmp/islamic_reel
                 '-c:a', 'aac', '-shortest', output_video_path
             ]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(f"✅ Islamic Reel Video Created: {output_video_path}")
+        print(f"[OK] Islamic Reel Video Created: {output_video_path}")
         return output_video_path
     except Exception as ve:
-        print(f"❌ Video rendering failed: {ve}")
+        print(f"[Error] Video rendering failed: {ve}")
         return None
     finally:
         for tmp in [temp_poster, temp_voice]:

@@ -57,7 +57,7 @@ class FacebookPoster:
         except Exception:
             return None
 
-    def post_reel(self, video_path, caption):
+    def post_reel(self, video_path, caption, scheduled_timestamp=None):
         """
         Uploads and publishes a Facebook Reel using the 3-phase video_reels API:
         1. Initialize upload session
@@ -100,22 +100,60 @@ class FacebookPoster:
                 print(f"❌ Video binary upload failed: {upload_res.status_code} {upload_res.text}")
                 return None
 
-            # Step 3: Finish and Publish
+            # Step 3: Finish and Publish / Schedule
             finish_url = f"{self.base_url}/{self.page_id}/video_reels"
             finish_payload = {
                 'upload_phase': 'finish',
                 'access_token': self.access_token,
                 'video_id': video_id,
-                'video_state': 'PUBLISHED',
                 'description': caption
             }
+            if scheduled_timestamp:
+                finish_payload['video_state'] = 'SCHEDULED'
+                finish_payload['scheduled_publish_time'] = str(scheduled_timestamp)
+            else:
+                finish_payload['video_state'] = 'PUBLISHED'
+
             finish_res = requests.post(finish_url, data=finish_payload, timeout=30).json()
             if finish_res.get('success'):
-                print(f"✅ Reel Published Successfully! Reel Video ID: {video_id}")
+                status_txt = "Scheduled" if scheduled_timestamp else "Published"
+                print(f"✅ Reel {status_txt} Successfully! Reel Video ID: {video_id}")
                 return video_id
             else:
-                print(f"❌ Failed to finish reels publish: {finish_res}")
+                print(f"❌ Failed to finish reels: {finish_res}")
                 return None
         except Exception as e:
             print(f"❌ post_reel exception: {e}")
             return None
+
+    def post_scheduled_image(self, message: str, image_path: str, scheduled_timestamp: int):
+        """
+        Upload photo as unpublished and schedule publish time (between 10 mins and 75-90 days in future)
+        """
+        url = f"{self.base_url}/{self.page_id}/photos"
+        try:
+            with open(image_path, 'rb') as img_file:
+                payload = {
+                    'message': message,
+                    'published': 'false',
+                    'scheduled_publish_time': str(scheduled_timestamp),
+                    'access_token': self.access_token,
+                }
+                files = {'source': ('post_image.jpg', img_file, 'image/jpeg')}
+                response = requests.post(url, data=payload, files=files, timeout=60)
+
+            result = response.json()
+            if 'id' in result:
+                print(f"✅ Photo Scheduled successfully! ID: {result['id']} for unix timestamp: {scheduled_timestamp}")
+                return result['id']
+            else:
+                print(f"❌ Scheduled image failed: {result.get('error', {}).get('message', result)}")
+                return None
+        except Exception as e:
+            print(f"❌ Scheduled image error: {e}")
+            return None
+
+    def post_scheduled_reel(self, video_path: str, caption: str, scheduled_timestamp: int):
+        """Uploads and schedules an Islamic Facebook Reel for future publishing"""
+        return self.post_reel(video_path, caption, scheduled_timestamp=scheduled_timestamp)
+
