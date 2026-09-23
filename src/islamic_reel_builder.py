@@ -70,12 +70,22 @@ class IslamicReelBuilder:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return float(res.stdout.strip())
 
-    def render_overlay_html(self, topic_title: str, hadith_ref: str, category="ঈমান নসিহত") -> str:
+    def render_overlay_html(self, topic_title: str, hadith_ref: str, category="ঈমান নসিহত", captions=None) -> str:
         """
-        Renders transparent PNG overlay with perfect Bengali typography (Hind Siliguri)
+        Renders transparent PNG overlay with perfect Bengali typography (Hind Siliguri) and dynamic captions
         """
         overlay_html_path = os.path.join(self.temp_dir, 'overlay_temp.html')
         overlay_png_path = os.path.join(self.temp_dir, 'overlay_temp.png')
+
+        caps_html = ""
+        if captions and len(captions) > 0:
+            caps_items = "".join([f'<div class="cap-pill">✨ {c}</div>' for c in captions[:3]])
+            caps_html = f"""
+            <div class="caption-container">
+                <div class="caption-header">নসিহত ও সমাধান</div>
+                <div class="caption-list">{caps_items}</div>
+            </div>
+            """
 
         html = f"""<!DOCTYPE html>
 <html>
@@ -101,6 +111,7 @@ class IslamicReelBuilder:
     flex-direction: column;
     align-items: center;
     gap: 15px;
+    width: 100%;
   }}
   .badge {{
     background: #F5B041;
@@ -115,14 +126,47 @@ class IslamicReelBuilder:
     background: rgba(15, 23, 42, 0.88);
     border: 2px solid rgba(245, 176, 65, 0.6);
     color: #ffffff;
-    font-size: 46px;
+    font-size: 44px;
     font-weight: 700;
-    padding: 20px 45px;
+    padding: 20px 40px;
     border-radius: 22px;
     text-align: center;
     backdrop-filter: blur(10px);
     box-shadow: 0 10px 35px rgba(0,0,0,0.6);
     line-height: 1.35;
+    max-width: 950px;
+  }}
+  .caption-container {{
+    background: rgba(15, 23, 42, 0.85);
+    border: 1.5px solid rgba(245, 176, 65, 0.5);
+    border-radius: 20px;
+    padding: 16px 28px;
+    margin-top: 15px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+    text-align: center;
+    max-width: 850px;
+  }}
+  .caption-header {{
+    color: #F5B041;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }}
+  .caption-list {{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }}
+  .cap-pill {{
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: 12px;
+    border-left: 4px solid #F5B041;
+    text-align: left;
   }}
   .bottom-card {{
     background: rgba(15, 23, 42, 0.88);
@@ -140,6 +184,7 @@ class IslamicReelBuilder:
   <div class="top-box">
     <div class="badge">{category}</div>
     <div class="title-card">{topic_title}</div>
+    {caps_html}
   </div>
   <div class="bottom-card">{hadith_ref}</div>
 </body>
@@ -166,7 +211,8 @@ class IslamicReelBuilder:
         scholar_answer: str,
         topic_title: str,
         hadith_ref: str,
-        output_reel_path: str
+        output_reel_path: str,
+        captions=None
     ):
         """
         Creates a complete Alem-Youth mentorship reel
@@ -175,7 +221,7 @@ class IslamicReelBuilder:
         asyncio.run(self.build_mentorship_audio(youth_question, scholar_answer, audio_path))
         
         duration = self.get_audio_duration(audio_path) + 1.0 # 1 sec buffer
-        overlay_png = self.render_overlay_html(topic_title, hadith_ref, category="ঈমান নসিহত")
+        overlay_png = self.render_overlay_html(topic_title, hadith_ref, category="ঈমান নসিহত", captions=captions)
 
         filter_complex = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[bg][1:v]overlay=0:0[vout]"
 
@@ -199,12 +245,21 @@ class IslamicReelBuilder:
         print(f"SUCCESS: Generated {output_reel_path} (Duration: {duration:.1f}s)")
         return output_reel_path
 
-    def render_quran_overlay_html(self, surah_ref: str, arabic_verse: str, bangla_meaning: str) -> str:
+    def render_quran_overlay_html(self, surah_ref: str, arabic_verse: str, bangla_meaning: str, captions=None) -> str:
         """
-        Renders transparent PNG overlay for Quran Reflection reels
+        Renders transparent PNG overlay for Quran Reflection reels with optional dynamic keyword captions
         """
         overlay_html_path = os.path.join(self.temp_dir, 'quran_overlay.html')
         overlay_png_path = os.path.join(self.temp_dir, 'quran_overlay.png')
+
+        caps_html = ""
+        if captions and len(captions) > 0:
+            caps_items = "".join([f'<div class="quran-pill">🌿 {c}</div>' for c in captions[:3]])
+            caps_html = f"""
+            <div class="quran-caps-box">
+                <div class="quran-caps-list">{caps_items}</div>
+            </div>
+            """
 
         html = f"""<!DOCTYPE html>
 <html>
@@ -264,6 +319,26 @@ class IslamicReelBuilder:
     color: #ffffff;
     line-height: 1.4;
   }}
+  .quran-caps-box {{
+    margin-top: 15px;
+    width: 85%;
+  }}
+  .quran-caps-list {{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }}
+  .quran-pill {{
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-left: 4px solid #10B981;
+    color: #ffffff;
+    font-size: 26px;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: 12px;
+    text-align: left;
+  }}
   .bottom-card {{
     background: rgba(15, 23, 42, 0.88);
     border: 1.5px solid rgba(16, 185, 129, 0.5);
@@ -283,6 +358,7 @@ class IslamicReelBuilder:
       <div class="arabic">{arabic_verse}</div>
       <div class="meaning">« {bangla_meaning} »</div>
     </div>
+    {caps_html}
   </div>
   <div class="bottom-card">{surah_ref}</div>
 </body>
@@ -309,7 +385,8 @@ class IslamicReelBuilder:
         surah_ref: str,
         arabic_verse: str,
         bangla_meaning: str,
-        output_reel_path: str
+        output_reel_path: str,
+        captions=None
     ):
         """
         Creates a complete Quran reflection reel
@@ -318,7 +395,7 @@ class IslamicReelBuilder:
         asyncio.run(self.generate_speech_audio(voiceover_text, "bn-BD-PradeepNeural", audio_path, pitch="-2Hz", rate="-4%"))
         
         duration = self.get_audio_duration(audio_path) + 1.0
-        overlay_png = self.render_quran_overlay_html(surah_ref, arabic_verse, bangla_meaning)
+        overlay_png = self.render_quran_overlay_html(surah_ref, arabic_verse, bangla_meaning, captions=captions)
 
         filter_complex = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[bg][1:v]overlay=0:0[vout]"
 
