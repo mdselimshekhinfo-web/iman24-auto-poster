@@ -199,17 +199,145 @@ class IslamicReelBuilder:
         print(f"SUCCESS: Generated {output_reel_path} (Duration: {duration:.1f}s)")
         return output_reel_path
 
-if __name__ == '__main__':
-    builder = IslamicReelBuilder()
-    
-    test_bg = r"C:\Users\SHEIK SADI\Desktop\fb_schedule_batch_week4\iman_reels\iman_day1_slot2.mp4"
-    if os.path.exists(test_bg):
-        out = r"F:\fb_iman\test_mentorship_reel_demo.mp4"
-        builder.create_mentorship_reel(
-            bg_video_path=test_bg,
-            youth_question="হুজুর, জীবনে কোনো কাজেই বরকত পাচ্ছি না, সবসময় মন খারাপ থাকে... কী করব?",
-            scholar_answer="প্রিয় বৎস, রাসুলুল্লাহ সাল্লাল্লাহু আলাইহি ওয়া সাল্লাম বলেছেন—যে ব্যক্তি বেশি বেশি ইস্তিগফার করে, আল্লাহ তার সকল দুশ্চিন্তা দূর করে দেন এবং অচিন্তনীয় উৎস থেকে রিজিক ও বরকত দান করেন।",
-            topic_title="জীবনে বরকত ও রিজিক বৃদ্ধির আমল",
-            hadith_ref="— সুনানে আবু দাউদ : ১৫১৮",
-            output_reel_path=out
-        )
+    def render_quran_overlay_html(self, surah_ref: str, arabic_verse: str, bangla_meaning: str) -> str:
+        """
+        Renders transparent PNG overlay for Quran Reflection reels
+        """
+        overlay_html_path = os.path.join(self.temp_dir, 'quran_overlay.html')
+        overlay_png_path = os.path.join(self.temp_dir, 'quran_overlay.png')
+
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Hind+Siliguri:wght@600;700&display=swap');
+  body {{
+    margin: 0;
+    width: 1080px;
+    height: 1920px;
+    background: transparent;
+    font-family: 'Hind Siliguri', 'Nirmala UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 80px 40px;
+    box-sizing: border-box;
+  }}
+  .top-box {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+  }}
+  .badge {{
+    background: #10B981;
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 700;
+    padding: 8px 32px;
+    border-radius: 50px;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+  }}
+  .verse-card {{
+    background: rgba(15, 23, 42, 0.90);
+    border: 2px solid rgba(16, 185, 129, 0.6);
+    padding: 25px 40px;
+    border-radius: 22px;
+    text-align: center;
+    box-shadow: 0 10px 35px rgba(0,0,0,0.6);
+    width: 90%;
+  }}
+  .arabic {{
+    font-family: 'Amiri', 'Traditional Arabic', serif;
+    font-size: 44px;
+    color: #F5B041;
+    line-height: 1.5;
+    direction: rtl;
+    margin-bottom: 15px;
+  }}
+  .meaning {{
+    font-size: 36px;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.4;
+  }}
+  .bottom-card {{
+    background: rgba(15, 23, 42, 0.88);
+    border: 1.5px solid rgba(16, 185, 129, 0.5);
+    color: #10B981;
+    font-size: 34px;
+    font-weight: 600;
+    padding: 16px 40px;
+    border-radius: 18px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  }}
+</style>
+</head>
+<body>
+  <div class="top-box">
+    <div class="badge">কোরআনের উপলব্ধি</div>
+    <div class="verse-card">
+      <div class="arabic">{arabic_verse}</div>
+      <div class="meaning">« {bangla_meaning} »</div>
+    </div>
+  </div>
+  <div class="bottom-card">{surah_ref}</div>
+</body>
+</html>"""
+        with open(overlay_html_path, 'w', encoding='utf-8') as f:
+            f.write(html)
+
+        cmd = [
+            CHROME_PATH,
+            '--headless=new',
+            '--default-background-color=00000000',
+            f'--screenshot={overlay_png_path}',
+            '--window-size=1080,1920',
+            '--hide-scrollbars',
+            overlay_html_path
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return overlay_png_path
+
+    def create_quran_reflection_reel(
+        self,
+        bg_video_path: str,
+        voiceover_text: str,
+        surah_ref: str,
+        arabic_verse: str,
+        bangla_meaning: str,
+        output_reel_path: str
+    ):
+        """
+        Creates a complete Quran reflection reel
+        """
+        audio_path = os.path.join(self.temp_dir, 'quran_audio.mp3')
+        asyncio.run(self.generate_speech_audio(voiceover_text, "bn-BD-PradeepNeural", audio_path, pitch="-2Hz", rate="-4%"))
+        
+        duration = self.get_audio_duration(audio_path) + 1.0
+        overlay_png = self.render_quran_overlay_html(surah_ref, arabic_verse, bangla_meaning)
+
+        filter_complex = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[bg][1:v]overlay=0:0[vout]"
+
+        cmd = [
+            'ffmpeg', '-y',
+            '-stream_loop', '-1', '-i', bg_video_path,
+            '-i', overlay_png,
+            '-i', audio_path,
+            '-t', str(duration),
+            '-filter_complex', filter_complex,
+            '-map', '[vout]',
+            '-map', '2:a',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '22', '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '192k',
+            '-shortest',
+            output_reel_path
+        ]
+
+        print(f"Rendering Quran Reflection Reel: {os.path.basename(output_reel_path)}")
+        subprocess.run(cmd, check=True)
+        print(f"SUCCESS: Generated {output_reel_path} (Duration: {duration:.1f}s)")
+        return output_reel_path
